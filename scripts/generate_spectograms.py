@@ -3,12 +3,12 @@
 
 import os
 import librosa
-import librosa.display
 import matplotlib.pyplot as plt
 from glob import glob
 import numpy as np
 from PIL import Image
 import matplotlib.cm as cm
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # CHANGE, IF NECESSARY
 DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
@@ -34,7 +34,7 @@ os.makedirs(segments_OUTPUT_PATH, exist_ok=True)
 
 audio_files = glob(DATASET_PATH + "/*/*.wav")
 
-for filepath in sorted(audio_files):
+def process_file(filepath):
     genre = filepath.split("/")[-2]
     fname = filepath.split("/")[-1].replace(".wav", "")
 
@@ -49,7 +49,7 @@ for filepath in sorted(audio_files):
         y, sr = librosa.load(filepath, sr=sample_rate)
     except Exception as e:
         print("Erro ao carregar:", filepath, "|", e)
-        continue
+        return
 
     # FULL
     S_full = librosa.feature.melspectrogram(
@@ -60,8 +60,6 @@ for filepath in sorted(audio_files):
         n_mels=N_MELS
     )
     S_full_dB = librosa.power_to_db(S_full, ref=np.max)
-
-    # Normalizar e aplicar colormap -> imagem RGB
     norm = (S_full_dB - S_full_dB.min()) / (S_full_dB.max() - S_full_dB.min() + 1e-6)
     norm = np.flipud(norm)
     rgba = cm.get_cmap('magma')(norm)
@@ -85,7 +83,6 @@ for filepath in sorted(audio_files):
             n_mels=N_MELS
         )
         S_dB = librosa.power_to_db(S, ref=np.max)
-
         norm_s = (S_dB - S_dB.min()) / (S_dB.max() - S_dB.min() + 1e-6)
         norm_s = np.flipud(norm_s)
         rgba_s = cm.get_cmap('magma')(norm_s)
@@ -94,6 +91,13 @@ for filepath in sorted(audio_files):
         img_s = img_s.resize(TARGET_SIZE, Image.LANCZOS)
         seg_path = os.path.join(genre_seg_dir, f"{fname}_{n}.png")
         img_s.save(seg_path)
+
+# Parallel processing of audio files
+max_workers = min(4, os.cpu_count() or 1)
+with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    futures = [executor.submit(process_file, fp) for fp in sorted(audio_files)]
+    for future in as_completed(futures):
+        pass  # Awaits all threads to finish
 
 print("\nSpectograms full: ", full_OUTPUT_PATH)
 print("Spectograms segmenteds: ", segments_OUTPUT_PATH)
