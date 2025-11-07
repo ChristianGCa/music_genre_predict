@@ -11,7 +11,7 @@ from PIL import Image
 import matplotlib.cm as cm
 
 # CHANGE, IF NECESSARY
-DATASET_PATH = "/home/christian/Documentos/music_dataset (Cópia)/Data/genres_original/"
+DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
 OUTPUT_PATH  = "./spectrograms/"
 
 sample_rate  = 22050
