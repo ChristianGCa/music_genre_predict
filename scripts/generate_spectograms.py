@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 
 # CHANGE, IF NECESSARY
 DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
-OUTPUT_PATH  = "./spectrograms/"
+OUTPUT_PATH  = "/home/chris/Documents/spectrograms/"
 
 sample_rate  = 22050
 num_segments = 10  # 3 seconds
@@ -20,7 +20,7 @@ duration     = 30
 samples_per_segment = int(sample_rate * duration / num_segments)
 
 # Parameters tuned for lower-resolution images suitable for CNN training
-TARGET_SIZE = (128, 128)  # (width, height) in pixels
+TARGET_SIZE = (224, 224)  # (width, height) in pixels
 N_MELS = 128
 N_FFT = 2048
 HOP_LENGTH = 512
@@ -63,6 +63,7 @@ for filepath in sorted(audio_files):
 
     # Normalizar e aplicar colormap -> imagem RGB
     norm = (S_full_dB - S_full_dB.min()) / (S_full_dB.max() - S_full_dB.min() + 1e-6)
+    norm = np.flipud(norm)
     rgba = cm.get_cmap('magma')(norm)
     rgb = (rgba[:, :, :3] * 255).astype(np.uint8)
     img = Image.fromarray(rgb)
@@ -86,6 +87,7 @@ for filepath in sorted(audio_files):
         S_dB = librosa.power_to_db(S, ref=np.max)
 
         norm_s = (S_dB - S_dB.min()) / (S_dB.max() - S_dB.min() + 1e-6)
+        norm_s = np.flipud(norm_s)
         rgba_s = cm.get_cmap('magma')(norm_s)
         rgb_s = (rgba_s[:, :, :3] * 255).astype(np.uint8)
         img_s = Image.fromarray(rgb_s)
