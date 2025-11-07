@@ -1,182 +1,141 @@
-# Script to generate two CSV files with the audio features, one for the first block and one for the second block
-# Some examples of features are: Intensity (RMS), Frequency (Spectral Centroid), Bandwidth (Spectral Bandwidth), etc.
-
 import librosa
 from glob import glob
 import pandas as pd
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# Place it in the correct location.
+# Change, if necessary
 DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
 OUTPUT_PATH  = "/home/chris/Documents/CSVs/"
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-num_mfcc=20
-sample_rate=22050
-n_fft=2048
-hop_length=512
-num_segment_first_block=1
-num_segment_second_block=10
-my_csv={"filename":[], "chroma_stft_mean": [], "chroma_stft_var": [], "rms_mean": [], "rms_var": [], "spectral_centroid_mean": [],
-        "spectral_centroid_var": [], "spectral_bandwidth_mean": [], "spectral_bandwidth_var": [], "rolloff_mean": [], "rolloff_var": [],
-        "zero_crossing_rate_mean": [], "zero_crossing_rate_var": [], "harmony_mean": [], "harmony_var": [], "perceptr_mean": [],
-        "perceptr_var": [], "tempo": [], "mfcc1_mean": [], "mfcc1_var" : [], "mfcc2_mean" : [], "mfcc2_var" : [],
-        "mfcc3_mean" : [], "mfcc3_var" : [], "mfcc4_mean" : [], "mfcc4_var" : [], "mfcc5_mean" : [], 
-        "mfcc5_var" : [], "mfcc6_mean" : [], "mfcc6_var" : [], "mfcc7_mean" : [], "mfcc7_var" : [],
-        "mfcc8_mean" : [], "mfcc8_var" : [], "mfcc9_mean" : [], "mfcc9_var" : [], "mfcc10_mean" : [], 
-        "mfcc10_var" : [], "mfcc11_mean" : [], "mfcc11_var" : [], "mfcc12_mean" : [], "mfcc12_var" : [], 
-        "mfcc13_mean" : [], "mfcc13_var" : [], "mfcc14_mean" : [], "mfcc14_var" : [], "mfcc15_mean" : [], 
-        "mfcc15_var" : [], "mfcc16_mean" : [], "mfcc16_var" : [], "mfcc17_mean" : [], "mfcc17_var" : [], 
-        "mfcc18_mean" : [], "mfcc18_var" : [], "mfcc19_mean" : [], "mfcc19_var" : [], "mfcc20_mean" : [], 
-        "mfcc20_var":[], "label":[]}
-my_3_csv=my_csv.copy()
+num_mfcc = 20
+sample_rate = 22050
+n_fft = 2048
+hop_length = 512
+num_segment_second_block = 10
+samples_per_segment_second_block = int(sample_rate * 30 / num_segment_second_block)
 
-samples_per_segment_second_block = int(sample_rate*30/num_segment_second_block)
+columns = [
+    "filename", "chroma_stft_mean", "chroma_stft_var", "rms_mean", "rms_var",
+    "spectral_centroid_mean", "spectral_centroid_var", "spectral_bandwidth_mean", "spectral_bandwidth_var",
+    "rolloff_mean", "rolloff_var", "zero_crossing_rate_mean", "zero_crossing_rate_var",
+    "harmony_mean", "harmony_var", "perceptr_mean", "perceptr_var", "tempo"
+]
+for x in range(1, 21):
+    columns.append(f"mfcc{x}_mean")
+    columns.append(f"mfcc{x}_var")
+columns.append("label")
 
-audio_files = glob(DATASET_PATH + "/*/*")
-genre = glob(DATASET_PATH + "/*")
-n_genres=len(genre)
-genre=[genre[x].split('/')[-1] for x in range(n_genres)]
-print(genre)
+audio_files = sorted(glob(os.path.join(DATASET_PATH, "*/*")))
+genres = sorted(set(os.path.basename(os.path.dirname(f)) for f in audio_files))
+print("Genres", genres)
 
-genre_first_block=""
-for f in sorted(audio_files):
-    if genre_first_block!=f.split('/')[-2]:
-        genre_first_block=f.split('/')[-2]
-        print("Processing: " + genre_first_block + "...")
-    fname=f.split('/')[-1]
-    try:
-        y, sr = librosa.load(f, sr=sample_rate)
-    except:
-        continue
-    
-    # Chromagram
-    chroma_hop_length = 512 
-    chromagram = librosa.feature.chroma_stft(y=y, sr=sample_rate, hop_length=chroma_hop_length)
-    my_csv["chroma_stft_mean"].append(chromagram.mean())
-    my_csv["chroma_stft_var"].append(chromagram.var())
-    
-    # Root Mean Square Energy
-    RMSEn= librosa.feature.rms(y=y)
-    my_csv["rms_mean"].append(RMSEn.mean())
-    my_csv["rms_var"].append(RMSEn.var())
-    
-    # Spectral Centroid
-    spec_cent=librosa.feature.spectral_centroid(y=y)
-    my_csv["spectral_centroid_mean"].append(spec_cent.mean())
-    my_csv["spectral_centroid_var"].append(spec_cent.var())
-    
-    # Spectral Bandwith
-    spec_band=librosa.feature.spectral_bandwidth(y=y,sr=sample_rate)
-    my_csv["spectral_bandwidth_mean"].append(spec_band.mean())
-    my_csv["spectral_bandwidth_var"].append(spec_band.var())
+def extract_features(y, sr):
+    feats = {}
+    chroma = librosa.feature.chroma_stft(y=y, sr=sr, hop_length=512)
+    feats["chroma_stft_mean"] = chroma.mean()
+    feats["chroma_stft_var"] = chroma.var()
 
-    # Rolloff
-    spec_roll=librosa.feature.spectral_rolloff(y=y,sr=sample_rate)
-    my_csv["rolloff_mean"].append(spec_roll.mean())
-    my_csv["rolloff_var"].append(spec_roll.var())
-    
-    # Zero Crossing Rate
-    zero_crossing=librosa.feature.zero_crossing_rate(y=y)
-    my_csv["zero_crossing_rate_mean"].append(zero_crossing.mean())
-    my_csv["zero_crossing_rate_var"].append(zero_crossing.var())
-    
-    # Harmonics and Perceptrual 
+    rms = librosa.feature.rms(y=y)
+    feats["rms_mean"] = rms.mean()
+    feats["rms_var"] = rms.var()
+
+    centroid = librosa.feature.spectral_centroid(y=y)
+    feats["spectral_centroid_mean"] = centroid.mean()
+    feats["spectral_centroid_var"] = centroid.var()
+
+    bandwidth = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+    feats["spectral_bandwidth_mean"] = bandwidth.mean()
+    feats["spectral_bandwidth_var"] = bandwidth.var()
+
+    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+    feats["rolloff_mean"] = rolloff.mean()
+    feats["rolloff_var"] = rolloff.var()
+
+    zcr = librosa.feature.zero_crossing_rate(y=y)
+    feats["zero_crossing_rate_mean"] = zcr.mean()
+    feats["zero_crossing_rate_var"] = zcr.var()
+
     harmony, perceptr = librosa.effects.hpss(y=y)
-    my_csv["harmony_mean"].append(harmony.mean())
-    my_csv["harmony_var"].append(harmony.var())
-    my_csv["perceptr_mean"].append(perceptr.mean())
-    my_csv["perceptr_var"].append(perceptr.var())
-    
-    # Time
-    tempo, _ = librosa.beat.beat_track(y=y, sr = sr)
-    my_csv["tempo"].append(tempo)
+    feats["harmony_mean"] = harmony.mean()
+    feats["harmony_var"] = harmony.var()
+    feats["perceptr_mean"] = perceptr.mean()
+    feats["perceptr_var"] = perceptr.var()
 
-    # Means and variances of MFCCs
-    mfcc=librosa.feature.mfcc(y=y,sr=sample_rate, n_mfcc=num_mfcc, n_fft=n_fft, hop_length=hop_length)
-    mfcc=mfcc.T
-    my_csv["filename"].append(fname)
-    my_csv["label"].append(f.split('/')[-2])
+    tempo, _ = librosa.beat.beat_track(y=y, sr=sr)
+    feats["tempo"] = tempo
+
+    mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=num_mfcc, n_fft=n_fft, hop_length=hop_length).T
     for x in range(20):
-        feat1 = "mfcc" + str(x+1) + "_mean"
-        feat2 = "mfcc" + str(x+1) + "_var"
-        my_csv[feat1].append(mfcc[:,x].mean())
-        my_csv[feat2].append(mfcc[:,x].var())
-    print(fname)
+        feats[f"mfcc{x+1}_mean"] = mfcc[:, x].mean()
+        feats[f"mfcc{x+1}_var"] = mfcc[:, x].var()
 
-df = pd.DataFrame(my_csv)
-df.to_csv(os.path.join(OUTPUT_PATH, 'data.csv'), index=False)
+    return feats
 
 
-
-genre=""
-for f in sorted(audio_files):
-    if genre!=f.split('/')[-2]:
-        genre=f.split('/')[-2]
-        print("Procesassing " + genre + "...")
-    fname=f.split('/')[-1]
-    #print(fname)
+def process_full_audio(file_path):
     try:
-        y, sr = librosa.load(f, sr=sample_rate)
-    except:
-        continue
-    
-    for n in range(num_segment_second_block):
-        y_seg = y[samples_per_segment_second_block*n: samples_per_segment_second_block*(n+1)]
-        # Chromagram
-        chroma_hop_length = 512
-        chromagram = librosa.feature.chroma_stft(y=y_seg, sr=sample_rate, hop_length=chroma_hop_length)
-        my_3_csv["chroma_stft_mean"].append(chromagram.mean())
-        my_3_csv["chroma_stft_var"].append(chromagram.var())
+        y, sr = librosa.load(file_path, sr=sample_rate)
+        genre = os.path.basename(os.path.dirname(file_path))
+        fname = os.path.basename(file_path)
+        print(f"Processing full: {fname}")
+        feats = extract_features(y, sr)
+        feats["filename"] = fname
+        feats["label"] = genre
+        return feats
+    except Exception as e:
+        print(f"Process error {file_path}: {e}")
+        return None
 
-        # Root Mean Square Energy
-        RMSEn= librosa.feature.rms(y=y_seg)
-        my_3_csv["rms_mean"].append(RMSEn.mean())
-        my_3_csv["rms_var"].append(RMSEn.var())
 
-        # Spectral Centroid
-        spec_cent=librosa.feature.spectral_centroid(y=y_seg)
-        my_3_csv["spectral_centroid_mean"].append(spec_cent.mean())
-        my_3_csv["spectral_centroid_var"].append(spec_cent.var())
+def process_segmented_audio(file_path):
+    try:
+        y, sr = librosa.load(file_path, sr=sample_rate)
+        genre = os.path.basename(os.path.dirname(file_path))
+        fname = os.path.basename(file_path)
+        print(f"Processing segments: {fname}")
+        seg_features = []
 
-        # Spectral Bandwith
-        spec_band=librosa.feature.spectral_bandwidth(y=y_seg,sr=sample_rate)
-        my_3_csv["spectral_bandwidth_mean"].append(spec_band.mean())
-        my_3_csv["spectral_bandwidth_var"].append(spec_band.var())
+        for n in range(num_segment_second_block):
+            start = samples_per_segment_second_block * n
+            end = samples_per_segment_second_block * (n + 1)
+            y_seg = y[start:end]
+            if len(y_seg) == 0:
+                continue
+            feats = extract_features(y_seg, sr)
+            feats["filename"] = f"{os.path.splitext(fname)[0]}_{n}.wav"
+            feats["label"] = genre
+            seg_features.append(feats)
 
-        # Rolloff
-        spec_roll=librosa.feature.spectral_rolloff(y=y_seg,sr=sample_rate)
-        my_3_csv["rolloff_mean"].append(spec_roll.mean())
-        my_3_csv["rolloff_var"].append(spec_roll.var())
+        return seg_features
 
-        # Zero Crossing Rate
-        zero_crossing=librosa.feature.zero_crossing_rate(y=y_seg)
-        my_3_csv["zero_crossing_rate_mean"].append(zero_crossing.mean())
-        my_3_csv["zero_crossing_rate_var"].append(zero_crossing.var())
+    except Exception as e:
+        print(f"Error: {file_path}: {e}")
+        return []
 
-        # Harmonics and Perceptrual 
-        harmony, perceptr = librosa.effects.hpss(y=y_seg)
-        my_3_csv["harmony_mean"].append(harmony.mean())
-        my_3_csv["harmony_var"].append(harmony.var())
-        my_3_csv["perceptr_mean"].append(perceptr.mean())
-        my_3_csv["perceptr_var"].append(perceptr.var())
+print("\nGenerating full audio CSV")
+results_full = []
+with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    futures = [executor.submit(process_full_audio, f) for f in audio_files]
+    for f in as_completed(futures):
+        res = f.result()
+        if res:
+            results_full.append(res)
 
-        # Time
-        tempo, _ = librosa.beat.beat_track(y=y_seg, sr=sample_rate)
-        my_3_csv["tempo"].append(tempo)
+df_full = pd.DataFrame(results_full)
+df_full.to_csv(os.path.join(OUTPUT_PATH, 'data.csv'), index=False)
+print("Full CSV saved")
 
-        # Means and variances of MFCCs
-        mfcc=librosa.feature.mfcc(y=y_seg,sr=sample_rate, n_mfcc=num_mfcc, n_fft=n_fft, hop_length=hop_length)
-        mfcc=mfcc.T
-        fseg_name='.'.join(fname.split('.')[:2])+f'.{n}.wav'
-        my_3_csv["filename"].append(fseg_name)
-        my_3_csv["label"].append(genre)
-        for x in range(20):
-            feat1 = "mfcc" + str(x+1) + "_mean"
-            feat2 = "mfcc" + str(x+1) + "_var"
-            my_3_csv[feat1].append(mfcc[:,x].mean())
-            my_3_csv[feat2].append(mfcc[:,x].var())
-    print(fname)
+print("\nGenerating 3 seconds segments CSV")
+all_segments = []
+with ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
+    futures = [executor.submit(process_segmented_audio, f) for f in audio_files]
+    for f in as_completed(futures):
+        segs = f.result()
+        if segs:
+            all_segments.extend(segs)
 
-df = pd.DataFrame(my_3_csv)
-df.to_csv(os.path.join(OUTPUT_PATH, 'features_3_sec.csv'), index=False)
+df_segments = pd.DataFrame(all_segments)
+df_segments.to_csv(os.path.join(OUTPUT_PATH, 'features_3_sec.csv'), index=False)
+print(f"3 seconds CSV saved")
