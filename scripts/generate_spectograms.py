@@ -7,6 +7,8 @@ import librosa.display
 import matplotlib.pyplot as plt
 from glob import glob
 import numpy as np
+from PIL import Image
+import matplotlib.cm as cm
 
 # CHANGE, IF NECESSARY
 DATASET_PATH = "/home/christian/Documentos/music_dataset (Cópia)/Data/genres_original/"
@@ -16,6 +18,12 @@ sample_rate  = 22050
 num_segments = 10  # 3 seconds
 duration     = 30
 samples_per_segment = int(sample_rate * duration / num_segments)
+
+# Parameters tuned for lower-resolution images suitable for CNN training
+TARGET_SIZE = (128, 128)  # (width, height) in pixels
+N_MELS = 128
+N_FFT = 2048
+HOP_LENGTH = 512
 
 # Output directories
 full_OUTPUT_PATH = os.path.join(OUTPUT_PATH, "full")
@@ -47,19 +55,20 @@ for filepath in sorted(audio_files):
     S_full = librosa.feature.melspectrogram(
         y=y,
         sr=sr,
-        n_fft=4096,
-        hop_length=256,
-        n_mels=256
+        n_fft=N_FFT,
+        hop_length=HOP_LENGTH,
+        n_mels=N_MELS
     )
     S_full_dB = librosa.power_to_db(S_full, ref=np.max)
 
-    plt.figure(figsize=(10,4))
-    librosa.display.specshow(S_full_dB, sr=sr, cmap="magma")
-    plt.axis('off')
-
+    # Normalizar e aplicar colormap -> imagem RGB
+    norm = (S_full_dB - S_full_dB.min()) / (S_full_dB.max() - S_full_dB.min() + 1e-6)
+    rgba = cm.get_cmap('magma')(norm)
+    rgb = (rgba[:, :, :3] * 255).astype(np.uint8)
+    img = Image.fromarray(rgb)
+    img = img.resize(TARGET_SIZE, Image.LANCZOS)
     full_path = os.path.join(genre_full_dir, f"{fname}_full.png")
-    plt.savefig(full_path, bbox_inches='tight', pad_inches=0)
-    plt.close()
+    img.save(full_path)
 
     # PER SEGMENTS
     for n in range(num_segments):
@@ -70,19 +79,19 @@ for filepath in sorted(audio_files):
         S = librosa.feature.melspectrogram(
             y=y_seg,
             sr=sr,
-            n_fft=4096,
-            hop_length=256,
-            n_mels=256
+            n_fft=N_FFT,
+            hop_length=HOP_LENGTH,
+            n_mels=N_MELS
         )
         S_dB = librosa.power_to_db(S, ref=np.max)
 
-        plt.figure(figsize=(5,4))
-        librosa.display.specshow(S_dB, sr=sr, cmap="magma")
-        plt.axis('off')
-
+        norm_s = (S_dB - S_dB.min()) / (S_dB.max() - S_dB.min() + 1e-6)
+        rgba_s = cm.get_cmap('magma')(norm_s)
+        rgb_s = (rgba_s[:, :, :3] * 255).astype(np.uint8)
+        img_s = Image.fromarray(rgb_s)
+        img_s = img_s.resize(TARGET_SIZE, Image.LANCZOS)
         seg_path = os.path.join(genre_seg_dir, f"{fname}_{n}.png")
-        plt.savefig(seg_path, bbox_inches='tight', pad_inches=0)
-        plt.close()
+        img_s.save(seg_path)
 
 print("\nSpectograms full: ", full_OUTPUT_PATH)
 print("Spectograms segmenteds: ", segments_OUTPUT_PATH)
