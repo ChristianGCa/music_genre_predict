@@ -7,8 +7,8 @@ import pandas as pd
 import os
 
 # Place it in the correct location.
-DATASET_PATH="/home/christian/Documentos/music_dataset (Cópia)/Data/genres_original/"
-OUTPUT_PATH="./data/"
+DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
+OUTPUT_PATH  = "/home/chris/Documents/CSVs/"
 os.makedirs(OUTPUT_PATH, exist_ok=True)
 
 num_mfcc=20
@@ -50,49 +50,49 @@ for f in sorted(audio_files):
     except:
         continue
     
-    #Chromagram
+    # Chromagram
     chroma_hop_length = 512 
     chromagram = librosa.feature.chroma_stft(y=y, sr=sample_rate, hop_length=chroma_hop_length)
     my_csv["chroma_stft_mean"].append(chromagram.mean())
     my_csv["chroma_stft_var"].append(chromagram.var())
     
-    #Root Mean Square Energy
+    # Root Mean Square Energy
     RMSEn= librosa.feature.rms(y=y)
     my_csv["rms_mean"].append(RMSEn.mean())
     my_csv["rms_var"].append(RMSEn.var())
     
-    #Spectral Centroid
+    # Spectral Centroid
     spec_cent=librosa.feature.spectral_centroid(y=y)
     my_csv["spectral_centroid_mean"].append(spec_cent.mean())
     my_csv["spectral_centroid_var"].append(spec_cent.var())
     
-    #Spectral Bandwith
+    # Spectral Bandwith
     spec_band=librosa.feature.spectral_bandwidth(y=y,sr=sample_rate)
     my_csv["spectral_bandwidth_mean"].append(spec_band.mean())
     my_csv["spectral_bandwidth_var"].append(spec_band.var())
 
-    #Rolloff
+    # Rolloff
     spec_roll=librosa.feature.spectral_rolloff(y=y,sr=sample_rate)
     my_csv["rolloff_mean"].append(spec_roll.mean())
     my_csv["rolloff_var"].append(spec_roll.var())
     
-    #Zero Crossing Rate
+    # Zero Crossing Rate
     zero_crossing=librosa.feature.zero_crossing_rate(y=y)
     my_csv["zero_crossing_rate_mean"].append(zero_crossing.mean())
     my_csv["zero_crossing_rate_var"].append(zero_crossing.var())
     
-    #Harmonics and Perceptrual 
+    # Harmonics and Perceptrual 
     harmony, perceptr = librosa.effects.hpss(y=y)
     my_csv["harmony_mean"].append(harmony.mean())
     my_csv["harmony_var"].append(harmony.var())
     my_csv["perceptr_mean"].append(perceptr.mean())
     my_csv["perceptr_var"].append(perceptr.var())
     
-    #Tempo
+    # Time
     tempo, _ = librosa.beat.beat_track(y=y, sr = sr)
     my_csv["tempo"].append(tempo)
 
-    #MEDIAS Y VARIANZAS DE LOS MFCC
+    # Means and variances of MFCCs
     mfcc=librosa.feature.mfcc(y=y,sr=sample_rate, n_mfcc=num_mfcc, n_fft=n_fft, hop_length=hop_length)
     mfcc=mfcc.T
     my_csv["filename"].append(fname)
@@ -123,49 +123,49 @@ for f in sorted(audio_files):
     
     for n in range(num_segment_second_block):
         y_seg = y[samples_per_segment_second_block*n: samples_per_segment_second_block*(n+1)]
-        #Chromagram
+        # Chromagram
         chroma_hop_length = 512
         chromagram = librosa.feature.chroma_stft(y=y_seg, sr=sample_rate, hop_length=chroma_hop_length)
         my_3_csv["chroma_stft_mean"].append(chromagram.mean())
         my_3_csv["chroma_stft_var"].append(chromagram.var())
 
-        #Root Mean Square Energy
+        # Root Mean Square Energy
         RMSEn= librosa.feature.rms(y=y_seg)
         my_3_csv["rms_mean"].append(RMSEn.mean())
         my_3_csv["rms_var"].append(RMSEn.var())
 
-        #Spectral Centroid
+        # Spectral Centroid
         spec_cent=librosa.feature.spectral_centroid(y=y_seg)
         my_3_csv["spectral_centroid_mean"].append(spec_cent.mean())
         my_3_csv["spectral_centroid_var"].append(spec_cent.var())
 
-        #Spectral Bandwith
+        # Spectral Bandwith
         spec_band=librosa.feature.spectral_bandwidth(y=y_seg,sr=sample_rate)
         my_3_csv["spectral_bandwidth_mean"].append(spec_band.mean())
         my_3_csv["spectral_bandwidth_var"].append(spec_band.var())
 
-        #Rolloff
+        # Rolloff
         spec_roll=librosa.feature.spectral_rolloff(y=y_seg,sr=sample_rate)
         my_3_csv["rolloff_mean"].append(spec_roll.mean())
         my_3_csv["rolloff_var"].append(spec_roll.var())
 
-        #Zero Crossing Rate
+        # Zero Crossing Rate
         zero_crossing=librosa.feature.zero_crossing_rate(y=y_seg)
         my_3_csv["zero_crossing_rate_mean"].append(zero_crossing.mean())
         my_3_csv["zero_crossing_rate_var"].append(zero_crossing.var())
 
-        #Harmonics and Perceptrual 
+        # Harmonics and Perceptrual 
         harmony, perceptr = librosa.effects.hpss(y=y_seg)
         my_3_csv["harmony_mean"].append(harmony.mean())
         my_3_csv["harmony_var"].append(harmony.var())
         my_3_csv["perceptr_mean"].append(perceptr.mean())
         my_3_csv["perceptr_var"].append(perceptr.var())
 
-        #Tempo
+        # Time
         tempo, _ = librosa.beat.beat_track(y=y_seg, sr=sample_rate)
         my_3_csv["tempo"].append(tempo)
 
-        #MEDIAS Y VARIANZAS DE LOS MFCC
+        # Means and variances of MFCCs
         mfcc=librosa.feature.mfcc(y=y_seg,sr=sample_rate, n_mfcc=num_mfcc, n_fft=n_fft, hop_length=hop_length)
         mfcc=mfcc.T
         fseg_name='.'.join(fname.split('.')[:2])+f'.{n}.wav'

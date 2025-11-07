@@ -48,7 +48,7 @@ def process_file(filepath):
     try:
         y, sr = librosa.load(filepath, sr=sample_rate)
     except Exception as e:
-        print("Erro ao carregar:", filepath, "|", e)
+        print("Load error: ", filepath, "|", e)
         return
 
     # FULL
