@@ -1,103 +1,49 @@
-# This script generates Mel-spectrograms from audio files, for both full tracks and 3-second segments.
-# It saves these spectrograms as PNG images in specified output directories.
-
 import os
-import librosa
-import matplotlib.pyplot as plt
 from glob import glob
-import numpy as np
-from PIL import Image
-import matplotlib.cm as cm
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from audio_utils import load_audio, split_audio, save_mel_spectrogram
 
-# CHANGE, IF NECESSARY
-DATASET_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
-OUTPUT_PATH  = "/home/chris/Documents/spectrograms/"
+DATA_PATH = "/home/christian/Documentos/music_dataset/Data/genres_original/"
+OUT_PATH_30S = "./data/spectrograms_30s/"
+OUT_PATH_3S = "./data/spectrograms_3s/"
 
-sample_rate  = 22050
-num_segments = 10  # 3 seconds
-duration     = 30
-samples_per_segment = int(sample_rate * duration / num_segments)
+CHUNK_DURATION = 3  # segundos
+SR = 22050
 
-# Parameters tuned for lower-resolution images suitable for CNN training
-TARGET_SIZE = (224, 224)  # (width, height) in pixels
-N_MELS = 128
-N_FFT = 2048
-HOP_LENGTH = 512
+genres = [d for d in os.listdir(DATA_PATH) if os.path.isdir(os.path.join(DATA_PATH, d))]
 
-# Output directories
-full_OUTPUT_PATH = os.path.join(OUTPUT_PATH, "full")
-segments_OUTPUT_PATH = os.path.join(OUTPUT_PATH, "segments")
+for genre in genres:
+    os.makedirs(os.path.join(OUT_PATH_30S, genre), exist_ok=True)
+    os.makedirs(os.path.join(OUT_PATH_3S, genre), exist_ok=True)
 
-os.makedirs(full_OUTPUT_PATH, exist_ok=True)
-os.makedirs(segments_OUTPUT_PATH, exist_ok=True)
+for genre in genres:
+    wav_files = glob(os.path.join(DATA_PATH, genre, "*.wav"))
+    print(f"Processando {len(wav_files)} arquivos de {genre}...")
 
-audio_files = glob(DATASET_PATH + "/*/*.wav")
+    for idx, wav_file in enumerate(wav_files, 1):
+        try:
+            y = load_audio(wav_file, sr=SR)
+        except Exception as e:
+            print(f"⚠️  Não foi possível ler o arquivo: {wav_file}. Pulando. Erro: {e}")
+            continue
 
-def process_file(filepath):
-    genre = filepath.split("/")[-2]
-    fname = filepath.split("/")[-1].replace(".wav", "")
+        y_30s = y[:30*SR]  # pega até 30s
+        base_name = os.path.basename(wav_file).replace(".wav", "_30s.png")
+        out_file_30s = os.path.join(OUT_PATH_30S, genre, base_name)
+        try:
+            save_mel_spectrogram(y_30s, sr=SR, out_path=out_file_30s)
+        except Exception as e:
+            print(f"⚠️  Erro ao gerar espectrograma 30s: {wav_file}. Pulando. Erro: {e}")
+            continue
 
-    print(f"Processing: {genre} - {fname}...")
+        chunks = split_audio(y, sr=SR, chunk_duration=CHUNK_DURATION)
+        for i, chunk in enumerate(chunks):
+            base_name_chunk = os.path.basename(wav_file).replace(".wav", f"_{i}.png")
+            out_file_3s = os.path.join(OUT_PATH_3S, genre, base_name_chunk)
+            try:
+                save_mel_spectrogram(chunk, sr=SR, out_path=out_file_3s)
+            except Exception as e:
+                print(f"⚠️  Erro ao gerar espectrograma 3s: {wav_file}, chunk {i}. Pulando. Erro: {e}")
 
-    genre_full_dir = os.path.join(full_OUTPUT_PATH, genre)
-    genre_seg_dir = os.path.join(segments_OUTPUT_PATH, genre)
-    os.makedirs(genre_full_dir, exist_ok=True)
-    os.makedirs(genre_seg_dir, exist_ok=True)
+        print(f"Processado: {wav_file}  /  {len(wav_files)}")
 
-    try:
-        y, sr = librosa.load(filepath, sr=sample_rate)
-    except Exception as e:
-        print("Load error: ", filepath, "|", e)
-        return
-
-    # FULL
-    S_full = librosa.feature.melspectrogram(
-        y=y,
-        sr=sr,
-        n_fft=N_FFT,
-        hop_length=HOP_LENGTH,
-        n_mels=N_MELS
-    )
-    S_full_dB = librosa.power_to_db(S_full, ref=np.max)
-    norm = (S_full_dB - S_full_dB.min()) / (S_full_dB.max() - S_full_dB.min() + 1e-6)
-    norm = np.flipud(norm)
-    rgba = cm.get_cmap('magma')(norm)
-    rgb = (rgba[:, :, :3] * 255).astype(np.uint8)
-    img = Image.fromarray(rgb)
-    img = img.resize(TARGET_SIZE, Image.LANCZOS)
-    full_path = os.path.join(genre_full_dir, f"{fname}_full.png")
-    img.save(full_path)
-
-    # PER SEGMENTS
-    for n in range(num_segments):
-        start = samples_per_segment * n
-        end = start + samples_per_segment
-        y_seg = y[start:end]
-
-        S = librosa.feature.melspectrogram(
-            y=y_seg,
-            sr=sr,
-            n_fft=N_FFT,
-            hop_length=HOP_LENGTH,
-            n_mels=N_MELS
-        )
-        S_dB = librosa.power_to_db(S, ref=np.max)
-        norm_s = (S_dB - S_dB.min()) / (S_dB.max() - S_dB.min() + 1e-6)
-        norm_s = np.flipud(norm_s)
-        rgba_s = cm.get_cmap('magma')(norm_s)
-        rgb_s = (rgba_s[:, :, :3] * 255).astype(np.uint8)
-        img_s = Image.fromarray(rgb_s)
-        img_s = img_s.resize(TARGET_SIZE, Image.LANCZOS)
-        seg_path = os.path.join(genre_seg_dir, f"{fname}_{n}.png")
-        img_s.save(seg_path)
-
-# Parallel processing of audio files
-max_workers = min(4, os.cpu_count() or 1)
-with ThreadPoolExecutor(max_workers=max_workers) as executor:
-    futures = [executor.submit(process_file, fp) for fp in sorted(audio_files)]
-    for future in as_completed(futures):
-        pass  # Awaits all threads to finish
-
-print("\nSpectograms full: ", full_OUTPUT_PATH)
-print("Spectograms segmenteds: ", segments_OUTPUT_PATH)
+print("Todos os espectrogramas foram gerados (arquivos problemáticos foram pulados)!")
