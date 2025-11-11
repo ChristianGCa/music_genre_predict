@@ -46,6 +46,32 @@ class CNNModel(nn.Module):
 def train_and_save(DATA_DIR, RESULTS_DIR, model_name="cnn_model"):
     os.makedirs(RESULTS_DIR, exist_ok=True)
     
+    # ----------------------------------------------------
+    # NOVO: Função para salvar a amostra da imagem transformada
+    def save_sample_image(dataset, result_dir):
+        # Apenas pega a primeira imagem do dataset
+        sample_img_tensor, _ = dataset[0] 
+        
+        # O tensor de entrada é (1, H, W).
+        # Para salvar a imagem, precisamos remover a normalização.
+        # Desfaz a normalização (X * std + mean) para 1 canal (Grayscale)
+        mean = 0.5
+        std = 0.5
+        denormalized_tensor = sample_img_tensor * std + mean
+        
+        # Clipa os valores para garantir que fiquem no intervalo [0, 1]
+        denormalized_tensor = torch.clamp(denormalized_tensor, 0, 1)
+        
+        # Converte para PIL Image e salva
+        # O tensor é (C, H, W). Precisamos de (H, W) para PIL Image Grayscale (L)
+        img_to_save = transforms.ToPILImage()(denormalized_tensor.cpu())
+        
+        sample_path = os.path.join(result_dir, f"{model_name}_sample_processed.png")
+        img_to_save.save(sample_path)
+        print(f"Amostra de espectrograma processado salva em: {sample_path}")
+        
+    # ----------------------------------------------------
+
     transform = transforms.Compose([
         transforms.Grayscale(num_output_channels=1),
         transforms.Resize(IMG_SIZE),
@@ -54,6 +80,11 @@ def train_and_save(DATA_DIR, RESULTS_DIR, model_name="cnn_model"):
     ])
 
     dataset = datasets.ImageFolder(root=DATA_DIR, transform=transform)
+    
+    # NOVO: Chamada da função para salvar a amostra
+    if len(dataset) > 0:
+        save_sample_image(dataset, RESULTS_DIR)
+        
     dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
 
     num_classes = len(dataset.classes)
