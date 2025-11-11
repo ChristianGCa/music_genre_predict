@@ -36,7 +36,7 @@ def split_segments(y, sr=SR, segment_sec=3):
     seg_len = segment_sec * sr
     return [y[i:i+seg_len] for i in range(0, len(y), seg_len) if len(y[i:i+seg_len]) == seg_len]
 
-def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=128, fmax=8000):
+def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=256, fmax=8000):
     """
     Gera espectrograma mel e salva como imagem PNG.
     Se `out_path` for None, apenas retorna o array em dB.
@@ -45,7 +45,7 @@ def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=128, fmax=8000):
     S_dB = librosa.power_to_db(S, ref=np.max)
 
     if out_path:
-        plt.figure(figsize=(3, 3))
+        plt.figure(figsize=(2.56, 2.56))
         plt.axis('off')
         librosa.display.specshow(S_dB, sr=sr, fmax=fmax)
         plt.tight_layout()
@@ -82,7 +82,7 @@ def extract_features(y, sr=SR):
     return feats
 
 
-def load_spectrogram_as_tensor(image_path, img_size=(128, 128)):
+def load_spectrogram_as_tensor(image_path, img_size=(256, 256)):
     """
     Carrega uma imagem de espectrograma e converte em tensor normalizado
     compatível com a CNN usada no projeto.
