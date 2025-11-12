@@ -4,7 +4,7 @@ from glob import glob
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 
 from audio_utils import (
     convert_to_wav,
@@ -15,7 +15,7 @@ from audio_utils import (
     SR,
 )
 
-DATA_DIR = "/home/christian/Documentos/music_dataset/Data/genres_original/"
+DATA_DIR = "/home/christian/Documentos/music_dataset_20/Data/genres_original/"
 CSV_30S = "./data/csv/features_30s.csv"
 CSV_3S = "./data/csv/features_3s.csv"
 SEGMENT_DURATION = 3   # segundos
@@ -30,7 +30,7 @@ for genre_folder in os.listdir(DATA_DIR):
         audio_files = glob(os.path.join(genre_path, "*"))
         all_files.extend([(f, genre_folder) for f in audio_files])
 
-print(f"Encontrados {len(all_files)} arquivos de áudio em {DATA_DIR}\n")
+print(f"{len(all_files)} arquivos de áudio em {DATA_DIR}\n")
 
 rows_30s = []
 for idx, (file_path, genre) in enumerate(all_files, 1):
@@ -47,7 +47,7 @@ for idx, (file_path, genre) in enumerate(all_files, 1):
         feats["genre"] = genre
         rows_30s.append(feats)
 
-        print(f"[{idx}/{len(all_files)}] ✅ 30s: {file_path}")
+        print(f"[{idx}/{len(all_files)}] 30s: {file_path}")
     except Exception as e:
         print(f"Erro em {file_path}: {e}")
 
@@ -80,7 +80,7 @@ for idx, (file_path, genre) in enumerate(all_files, 1):
             feats["genre"] = genre
             rows_3s.append(feats)
 
-        print(f"[{idx}/{len(all_files)}] ✅ 3s: {file_path} ({len(segments)} segmentos)")
+        print(f"[{idx}/{len(all_files)}] 3s: {file_path} ({len(segments)} segmentos)")
     except Exception as e:
         print(f"Erro em {file_path}: {e}")
 
