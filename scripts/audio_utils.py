@@ -22,13 +22,19 @@ def load_audio(file_path, sr=SR):
     y, _ = librosa.load(file_path, sr=sr, mono=True)
     return y
 
-def extract_middle_segment(wav_path, duration=30, sr=SR):
-    """Extrai o trecho central de `duration` segundos de um arquivo WAV."""
-    y, _ = librosa.load(wav_path, sr=sr)
-    total_samples = len(y)
-    seg_samples = duration * sr
-    start = max(0, total_samples // 2 - seg_samples // 2)
-    end = start + seg_samples
+def extract_middle_segment(wav_path, duration=3.0, sr=22050):
+    try:
+        y, _ = librosa.load(wav_path, sr=sr)
+    except Exception as e:
+        print(f"[AVISO] Erro ao carregar {wav_path}: {e}")
+        return np.zeros(int(sr * duration))
+
+    total_duration = librosa.get_duration(y=y, sr=sr)
+    if total_duration < duration:
+        return np.pad(y, (0, int(sr * duration) - len(y)), mode="constant")
+
+    start = int((total_duration / 2 - duration / 2) * sr)
+    end = start + int(duration * sr)
     return y[start:end]
 
 def split_segments(y, sr=SR, segment_sec=3):
@@ -36,21 +42,27 @@ def split_segments(y, sr=SR, segment_sec=3):
     seg_len = segment_sec * sr
     return [y[i:i+seg_len] for i in range(0, len(y), seg_len) if len(y[i:i+seg_len]) == seg_len]
 
-def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=256, fmax=8000):
+def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=512, fmax=8000, img_size=512):
     """
-    Gera espectrograma mel e salva como imagem PNG.
-    Se `out_path` for None, apenas retorna o array em dB.
+    Gera espectrograma mel e salva como imagem PNG em alta resolução.
     """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import librosa.display
+    import numpy as np
+
     S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, fmax=fmax)
     S_dB = librosa.power_to_db(S, ref=np.max)
 
     if out_path:
-        plt.figure(figsize=(2.56, 2.56))
-        plt.axis('off')
-        librosa.display.specshow(S_dB, sr=sr, fmax=fmax)
-        plt.tight_layout()
-        plt.savefig(out_path, bbox_inches='tight', pad_inches=0)
-        plt.close()
+        fig = plt.figure(figsize=(img_size / 100, img_size / 100), dpi=100)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.axis("off")
+
+        librosa.display.specshow(S_dB, sr=sr, fmax=fmax, ax=ax)
+        fig.savefig(out_path, bbox_inches="tight", pad_inches=0)
+        plt.close(fig)
 
     return S_dB
 
@@ -82,7 +94,7 @@ def extract_features(y, sr=SR):
     return feats
 
 
-def load_spectrogram_as_tensor(image_path, img_size=(256, 256)):
+def load_spectrogram_as_tensor(image_path, img_size=(512, 512)):
     """
     Carrega uma imagem de espectrograma e converte em tensor normalizado
     compatível com a CNN usada no projeto.

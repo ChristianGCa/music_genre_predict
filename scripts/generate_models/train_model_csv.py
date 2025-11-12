@@ -58,7 +58,7 @@ class MLPModel(nn.Module):
 
 
 def train_model(csv_path, model_name):
-    print(f"\n🎵 Treinando modelo: {model_name}")
+    print(f"\nTreinando modelo: {model_name}")
     df = pd.read_csv(csv_path)
 
     result_path = os.path.join(RESULTS_DIR, model_name)
