@@ -52,7 +52,7 @@ for genre in genres:
                 )
                 save_mel_spectrogram(chunk, sr=SR, out_path=out_3s)
         except Exception as e:
-            print(f"rro ao gerar espectrogramas 3s ({file_path}): {e}")
+            print(f"Erro ao gerar espectrogramas 3s ({file_path}): {e}")
 
         print(f"{idx}/{len(files)} -> {os.path.basename(file_path)} processado.")
 

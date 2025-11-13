@@ -16,7 +16,7 @@ SPECTROGRAMS_30S_DIR = "./data/spectograms_30s"
 SPECTROGRAMS_3S_DIR = "./data/spectograms_3s"
 MODELS_DIR = "./models"
 RESULTS_DIR = "./results"
-EPOCHS = 2
+EPOCHS = 20
 BATCH_SIZE = 4
 LR = 0.0001
 IMAGE_SIZE = 512
@@ -48,7 +48,6 @@ class SpectrogramCNN(nn.Module):
         super(SpectrogramCNN, self).__init__()
         
         self.features = nn.Sequential(
-            # Bloco 1
             nn.Conv2d(3, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
@@ -58,7 +57,6 @@ class SpectrogramCNN(nn.Module):
             nn.MaxPool2d(2, 2),  # 512 -> 256
             nn.Dropout(0.25),
             
-            # Bloco 2
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
@@ -68,7 +66,6 @@ class SpectrogramCNN(nn.Module):
             nn.MaxPool2d(2, 2),  # 256 -> 128
             nn.Dropout(0.25),
             
-            # Bloco 3
             nn.Conv2d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
@@ -78,7 +75,6 @@ class SpectrogramCNN(nn.Module):
             nn.MaxPool2d(2, 2),  # 128 -> 64
             nn.Dropout(0.25),
             
-            # Bloco 4
             nn.Conv2d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
@@ -105,22 +101,20 @@ class SpectrogramCNN(nn.Module):
         x = self.classifier(x)
         return x
 
-# --- Função para carregar dados ---
 def load_data(base_dir):
     """Carrega caminhos de imagens e labels dos espectrogramas"""
     if not os.path.exists(base_dir):
-        raise FileNotFoundError(f"Diretório não encontrado: {base_dir}\nVerifique se o caminho está correto.")
+        raise FileNotFoundError(f"Diretório não encontrado: {base_dir}\n")
     
     image_paths = []
     labels = []
     genre_to_idx = {}
     
-    # Listar gêneros (subpastas)
     genres = sorted([d for d in os.listdir(base_dir) 
                     if os.path.isdir(os.path.join(base_dir, d))])
     
     if not genres:
-        raise ValueError(f"Nenhum gênero (subpasta) encontrado em: {base_dir}")
+        raise ValueError(f"Nenhum gênero encontrado em: {base_dir}")
     
     print(f"\nGêneros encontrados: {genres}")
     
@@ -143,7 +137,6 @@ def load_data(base_dir):
     
     return image_paths, labels, genre_to_idx
 
-# --- Função de treino ---
 def train_model(spec_dir, model_name):
     print(f"Treinando modelo: {model_name}")
     
@@ -247,7 +240,7 @@ def train_model(spec_dir, model_name):
         history['val_loss'].append(epoch_val_loss)
         history['val_acc'].append(epoch_val_acc)
         
-        print(f"Treino   | Loss: {epoch_train_loss:.4f} | Acc: {epoch_train_acc:.4f}")
+        print(f"Treino {model_name}| Loss: {epoch_train_loss:.4f} | Acc: {epoch_train_acc:.4f}")
         
         # Scheduler
         prev_lr = optimizer.param_groups[0]['lr']
@@ -256,16 +249,14 @@ def train_model(spec_dir, model_name):
         if new_lr != prev_lr:
             print(f"⚠ Learning rate ajustado: {prev_lr:.6f} → {new_lr:.6f}")
         
-        # Salvar melhor modelo
         if epoch_val_acc > best_val_acc:
             best_val_acc = epoch_val_acc
             best_model_path = os.path.join(MODELS_DIR, f"{model_name}.pth")
             torch.save(model.state_dict(), best_model_path)
-            print(f"✓ Melhor modelo salvo! Val Acc: {best_val_acc:.4f}")
+            print(f"Modelo salvo. Val Acc: {best_val_acc:.4f}")
         
         print()
     
-    # Carregar melhor modelo
     model.load_state_dict(torch.load(best_model_path))
     model.eval()
     
@@ -286,8 +277,6 @@ def train_model(spec_dir, model_name):
     print(f"Acurácia final no teste: {test_acc:.4f}")
     print(f"Melhor acurácia de validação: {best_val_acc:.4f}")
     
-    # --- Gráficos ---
-    # Acurácia
     plt.figure(figsize=(10, 5))
     plt.plot(history['train_acc'], label='Treino - Acurácia', linewidth=2)
     plt.plot(history['val_acc'], label='Validação - Acurácia', linewidth=2)
@@ -300,7 +289,6 @@ def train_model(spec_dir, model_name):
     plt.savefig(os.path.join(result_path, "accuracy_curve.png"), dpi=150)
     plt.close()
     
-    # Loss
     plt.figure(figsize=(10, 5))
     plt.plot(history['train_loss'], label='Treino - Loss', color='red', linewidth=2)
     plt.plot(history['val_loss'], label='Validação - Loss', color='orange', linewidth=2)
@@ -313,7 +301,6 @@ def train_model(spec_dir, model_name):
     plt.savefig(os.path.join(result_path, "loss_curve.png"), dpi=150)
     plt.close()
     
-    # Matriz de confusão
     cm = confusion_matrix(y_true, y_pred)
     genre_names = [idx_to_genre[i] for i in range(num_classes)]
     
@@ -325,7 +312,6 @@ def train_model(spec_dir, model_name):
     plt.savefig(os.path.join(result_path, "confusion_matrix.png"), dpi=150, bbox_inches='tight')
     plt.close()
     
-    # Relatório de classificação
     report = classification_report(y_true, y_pred, target_names=genre_names)
     report_path = os.path.join(result_path, "classification_report.txt")
     with open(report_path, "w") as f:
@@ -333,7 +319,6 @@ def train_model(spec_dir, model_name):
         f.write(report)
     print(f"Relatório salvo em: {report_path}")
     
-    # Erros de classificação
     errors_data = []
     for i in range(len(y_test)):
         if y_true[i] != y_pred[i]:
@@ -356,30 +341,26 @@ def train_model(spec_dir, model_name):
     print(f"Modelo salvo em: {best_model_path}")
     return genre_to_idx
 
-# --- Execução ---
 if __name__ == "__main__":
-    # Treinar CNN com espectrogramas de 30s
     if os.path.exists(SPECTROGRAMS_30S_DIR):
         try:
             genre_map_30s = train_model(SPECTROGRAMS_30S_DIR, "cnn_30s")
         except Exception as e:
-            print(f"\n❌ Erro ao treinar modelo 30s: {e}")
+            print(f"\nErro ao treinar modelo 30s: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print(f"\n⚠ Pulando treinamento 30s - diretório não encontrado")
+        print(f"\nPulando treinamento 30s - diretório não encontrado")
     
-    # Treinar CNN com espectrogramas de 3s
     if os.path.exists(SPECTROGRAMS_3S_DIR):
         try:
             genre_map_3s = train_model(SPECTROGRAMS_3S_DIR, "cnn_3s")
         except Exception as e:
-            print(f"\n❌ Erro ao treinar modelo 3s: {e}")
+            print(f"\nErro ao treinar modelo 3s: {e}")
             import traceback
             traceback.print_exc()
     else:
-        print(f"\n⚠ Pulando treinamento 3s - diretório não encontrado")
+        print(f"\nulando treinamento 3s - diretório não encontrado")
     
-    print("TREINAMENTO CONCLUÍDO!")
     print(f"\nModelos salvos em: {MODELS_DIR}")
     print(f"Resultados salvos em: {RESULTS_DIR}")
