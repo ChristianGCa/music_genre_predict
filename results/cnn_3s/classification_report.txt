@@ -1,17 +1,13 @@
-Acurácia Final no Teste: 0.2396
               precision    recall  f1-score   support
 
-       blues       0.46      0.55      0.50        40
-   classical       0.53      0.65      0.58        40
-     country       0.00      0.00      0.00        40
-       disco       0.00      0.00      0.00        40
-      hiphop       0.00      0.00      0.00        40
-        jazz       0.50      0.03      0.05        40
-       metal       0.16      1.00      0.28        49
-         pop       0.00      0.00      0.00        40
-      reggae       0.00      0.00      0.00        40
-        rock       0.00      0.00      0.00        40
+       blues       0.86      0.46      0.60       209
+   classical       0.64      0.97      0.78       197
+       disco       0.55      0.83      0.66       189
+        jazz       0.74      0.79      0.76       192
+       metal       0.90      0.70      0.79       197
+         pop       0.85      0.27      0.41       203
+        rock       0.46      0.61      0.52       211
 
-    accuracy                           0.24       409
-   macro avg       0.17      0.22      0.14       409
-weighted avg       0.16      0.24      0.14       409
+    accuracy                           0.66      1398
+   macro avg       0.71      0.66      0.65      1398
+weighted avg       0.71      0.66      0.64      1398

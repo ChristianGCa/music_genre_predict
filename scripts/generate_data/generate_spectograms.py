@@ -11,7 +11,7 @@ from audio_utils import (
     SR,
 )
 
-DATA_PATH = "/home/christian/Documentos/music_dataset_20/Data/genres_original/"
+DATA_PATH = "/home/christian/Documentos/music_dataset/Data/genres_original/"
 OUT_PATH_30S = "./data/spectograms_30s/"
 OUT_PATH_3S = "./data/spectograms_3s/"
 CHUNK_DURATION = 3  # segundos
