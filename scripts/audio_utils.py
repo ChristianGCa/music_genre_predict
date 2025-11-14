@@ -2,20 +2,52 @@ from PIL import Image
 from torchvision import transforms
 import numpy as np
 import librosa
-import librosa.display
 import matplotlib.pyplot as plt
 from pydub import AudioSegment
+import os
+import shutil
 
 SR = 22050
 
-def convert_to_wav(file_path):
-    """Converte MP3 para WAV (mantém se já for WAV)."""
-    if file_path.lower().endswith(".mp3"):
-        wav_path = file_path.rsplit(".", 1)[0] + ".wav"
-        audio = AudioSegment.from_mp3(file_path)
-        audio.export(wav_path, format="wav")
-        return wav_path
-    return file_path
+def convert_to_wav(file_path, out_dir='converted_wavs'):
+    """Converte MP3 para WAV e guarda o WAV numa pasta auxiliar dentro do projeto."""
+    try:
+        os.makedirs(out_dir, exist_ok=True)
+        base_name = os.path.splitext(os.path.basename(file_path))[0] + '.wav'
+        out_path = os.path.join(out_dir, base_name)
+
+        if file_path.lower().endswith('.mp3'):
+            audio = AudioSegment.from_mp3(file_path)
+            audio.export(out_path, format='wav')
+            print(f"Converted MP3 -> WAV: {out_path}")
+            return out_path
+
+        # if already wav, copy to out_dir for processing consistency
+        if file_path.lower().endswith('.wav'):
+            # Avoid copying if source and destination are the same file
+            try:
+                src_abs = os.path.abspath(file_path)
+                dst_abs = os.path.abspath(out_path)
+                if src_abs != dst_abs:
+                    shutil.copy(file_path, out_path)
+                    print(f"[INFO] Copied WAV to auxiliary folder: {out_path}")
+            except Exception:
+                # If copying fails, fall back to returning original path
+                return file_path
+            return out_path
+
+        # For other formats, attempt a generic load/export via pydub
+        try:
+            audio = AudioSegment.from_file(file_path)
+            audio.export(out_path, format='wav')
+            print(f"[INFO] Converted file -> WAV: {out_path}")
+            return out_path
+        except Exception:
+            # fallback: return original path if conversion not possible
+            return file_path
+    except Exception as e:
+        print(f"Falha ao criar pasta de conversão ou converter arquivo: {e}")
+        return file_path
 
 def load_audio(file_path, sr=SR):
     """Carrega o áudio e retorna o array mono."""

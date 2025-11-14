@@ -4,6 +4,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+try:
+    import torchaudio.transforms as T
+    TORCHAUDIO_AVAILABLE = True
+except Exception:
+    TORCHAUDIO_AVAILABLE = False
 from PIL import Image
 import sys
 import os
@@ -14,13 +19,35 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from audio_utils import load_spectrogram_as_tensor
 
-# Parâmetros
+# Simple SpecAugment implementation (works without torchaudio): masks time/freq bands on the tensor
+import torch.nn.functional as F
+import random
+
+def spec_augment(tensor, time_mask_param=30, freq_mask_param=15, num_time_masks=1, num_freq_masks=1):
+    # tensor shape: (C=1, H=freq, W=time)
+    if not isinstance(tensor, torch.Tensor):
+        return tensor
+    _, H, W = tensor.shape
+    t = tensor.clone()
+    for _ in range(num_time_masks):
+        t_len = random.randint(0, min(time_mask_param, W))
+        if t_len == 0:
+            continue
+        t_start = random.randint(0, max(0, W - t_len))
+        t[:, :, t_start:t_start + t_len] = 0
+    for _ in range(num_freq_masks):
+        f_len = random.randint(0, min(freq_mask_param, H))
+        if f_len == 0:
+            continue
+        f_start = random.randint(0, max(0, H - f_len))
+        t[:, f_start:f_start + f_len, :] = 0
+    return t
+
 BATCH_SIZE = 32
 EPOCHS = 10
 IMG_SIZE = (256, 256)
 LEARNING_RATE = 1e-4
 
-# Pastas dos espectrogramas
 SPECTROGRAMS = {
     'cnn_3s': 'data/spectograms_3s',
     'cnn_30s': 'data/spectograms_30s',
@@ -56,6 +83,18 @@ class SpectrogramDataset(Dataset):
             return tensor.squeeze(0), self.genres.index(genre)
         label = self.genres.index(genre)
         return img, label
+
+    def get_group(self, idx):
+        """Return a group id for the sample (used to avoid leakage between segments of same track).
+        Group is derived from filename before the final underscore, e.g. pop.00007_3.png -> pop.00007
+        If no underscore exists, falls back to filename without extension.
+        """
+        path, _ = self.samples[idx]
+        fname = os.path.basename(path)
+        name = os.path.splitext(fname)[0]
+        if '_' in name:
+            return name.rsplit('_', 1)[0]
+        return name
 
 class ImprovedCNN(nn.Module):
     """A small, deeper CNN with BatchNorm and Dropout and adaptive pooling."""
@@ -104,7 +143,8 @@ def train_model(spectrogram_type, save_path):
         transforms.RandomApply([transforms.RandomAffine(degrees=8, translate=(0.05, 0.05))], p=0.6),
         transforms.RandomApply([transforms.ColorJitter(brightness=0.1, contrast=0.1)], p=0.5),
         transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
+        transforms.Normalize([0.5], [0.5]),
+        transforms.Lambda(lambda x: spec_augment(x, time_mask_param=40, freq_mask_param=20, num_time_masks=2, num_freq_masks=2))
     ])
     val_transform = transforms.Compose([
         transforms.Resize(IMG_SIZE),
@@ -118,15 +158,66 @@ def train_model(spectrogram_type, save_path):
     # Create train/val datasets that share the same samples ordering but have different transforms
     train_dataset = SpectrogramDataset(SPECTROGRAMS[spectrogram_type], GENRES, IMG_SIZE, transform=train_transform, samples=samples)
     val_dataset = SpectrogramDataset(SPECTROGRAMS[spectrogram_type], GENRES, IMG_SIZE, transform=val_transform, samples=samples)
+
     # Split train/val (80/20)
-    indices = np.arange(len(samples))
-    np.random.shuffle(indices)
-    split = int(0.8 * len(indices))
-    train_idx, val_idx = indices[:split], indices[split:]
+    # For short segments (3s) we must avoid leakage: group by track id so all segments of one track
+    # are either in train or val. For 30s (one image per track) do stratified split per class to preserve balance.
+    num_samples = len(samples)
+    if spectrogram_type == 'cnn_3s':
+        # Group indices by group id (derived from filename)
+        group_to_indices = {}
+        for i in range(num_samples):
+            g = base_dataset.get_group(i)
+            group_to_indices.setdefault(g, []).append(i)
+        groups = list(group_to_indices.keys())
+        np.random.shuffle(groups)
+        # accumulate groups until 80% of samples assigned to train
+        train_idx_list = []
+        cnt = 0
+        target_train = int(0.8 * num_samples)
+        for g in groups:
+            if cnt >= target_train:
+                break
+            idxs = group_to_indices[g]
+            train_idx_list.extend(idxs)
+            cnt += len(idxs)
+        train_idx = np.array(sorted(train_idx_list), dtype=int)
+        # rest -> val
+        all_idx = np.arange(num_samples)
+        val_idx = np.setdiff1d(all_idx, train_idx)
+    else:
+        # stratified split by class label to keep per-class proportions stable (use simple per-class split)
+        idxs_by_class = {c: [] for c in range(len(GENRES))}
+        for i, (_, genre) in enumerate(samples):
+            idxs_by_class[GENRES.index(genre)].append(i)
+        train_idx_list, val_idx_list = [], []
+        for c, idxs in idxs_by_class.items():
+            idxs = np.array(idxs)
+            np.random.shuffle(idxs)
+            split = int(0.8 * len(idxs))
+            train_idx_list.extend(idxs[:split].tolist())
+            val_idx_list.extend(idxs[split:].tolist())
+        train_idx = np.array(sorted(train_idx_list), dtype=int)
+        val_idx = np.array(sorted(val_idx_list), dtype=int)
     # When creating train/val subsets, we need the train transform applied only on train set
     train_set = torch.utils.data.Subset(train_dataset, train_idx.tolist())
     val_set = torch.utils.data.Subset(val_dataset, val_idx.tolist())
-    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+
+    # Weighted sampler to help if class imbalance appears in train split
+    # compute class counts on train_set
+    train_labels = []
+    for idx in train_idx.tolist():
+        _, genre = samples[idx]
+        train_labels.append(GENRES.index(genre))
+    class_sample_count = np.array([train_labels.count(i) for i in range(len(GENRES))])
+    # avoid divide by zero
+    class_sample_count = np.where(class_sample_count == 0, 1, class_sample_count)
+    weights_per_class = 1.0 / class_sample_count
+    sample_weights = np.array([weights_per_class[label] for label in train_labels], dtype=float)
+    sample_weights_tensor = torch.tensor(sample_weights, dtype=torch.double)
+    sampler = torch.utils.data.WeightedRandomSampler(sample_weights_tensor.tolist(), num_samples=len(sample_weights), replacement=True)
+
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, sampler=sampler)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = ImprovedCNN(num_classes=len(GENRES)).to(device)
