@@ -19,7 +19,6 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from audio_utils import load_spectrogram_as_tensor
 
-# Simple SpecAugment implementation (works without torchaudio): masks time/freq bands on the tensor
 import torch.nn.functional as F
 import random
 
@@ -44,7 +43,7 @@ def spec_augment(tensor, time_mask_param=30, freq_mask_param=15, num_time_masks=
     return t
 
 BATCH_SIZE = 32
-EPOCHS = 10
+EPOCHS = 40
 IMG_SIZE = (256, 256)
 LEARNING_RATE = 1e-4
 
@@ -52,6 +51,9 @@ SPECTROGRAMS = {
     'cnn_3s': 'data/spectograms_3s',
     'cnn_30s': 'data/spectograms_30s',
 }
+
+os.makedirs(SPECTROGRAMS['cnn_3s'], exist_ok=True)
+os.makedirs(SPECTROGRAMS['cnn_30s'], exist_ok=True)
 
 GENRES = sorted(os.listdir(SPECTROGRAMS['cnn_3s']))
 
@@ -73,7 +75,6 @@ class SpectrogramDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path, genre = self.samples[idx]
-        # Load PIL image here and apply transforms (gives more flexibility for augmentation)
         img = Image.open(img_path).convert('L')
         if self.transform:
             img = self.transform(img)
@@ -104,7 +105,7 @@ class ImprovedCNN(nn.Module):
             nn.Conv2d(1, 32, kernel_size=3, padding=1),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.MaxPool2d(2),
+            nn.MaxPool2d(2), # height and width / 2
 
             nn.Conv2d(32, 64, kernel_size=3, padding=1),
             nn.BatchNorm2d(64),
@@ -152,26 +153,21 @@ def train_model(spectrogram_type, save_path):
         transforms.Normalize([0.5], [0.5])
     ])
 
-    # Build a base dataset to collect sample list (no transform)
     base_dataset = SpectrogramDataset(SPECTROGRAMS[spectrogram_type], GENRES, IMG_SIZE, transform=None)
     samples = base_dataset.samples
-    # Create train/val datasets that share the same samples ordering but have different transforms
+
     train_dataset = SpectrogramDataset(SPECTROGRAMS[spectrogram_type], GENRES, IMG_SIZE, transform=train_transform, samples=samples)
     val_dataset = SpectrogramDataset(SPECTROGRAMS[spectrogram_type], GENRES, IMG_SIZE, transform=val_transform, samples=samples)
 
-    # Split train/val (80/20)
-    # For short segments (3s) we must avoid leakage: group by track id so all segments of one track
-    # are either in train or val. For 30s (one image per track) do stratified split per class to preserve balance.
     num_samples = len(samples)
     if spectrogram_type == 'cnn_3s':
-        # Group indices by group id (derived from filename)
+        # Group indices by group id
         group_to_indices = {}
         for i in range(num_samples):
             g = base_dataset.get_group(i)
             group_to_indices.setdefault(g, []).append(i)
         groups = list(group_to_indices.keys())
         np.random.shuffle(groups)
-        # accumulate groups until 80% of samples assigned to train
         train_idx_list = []
         cnt = 0
         target_train = int(0.8 * num_samples)
@@ -203,8 +199,6 @@ def train_model(spectrogram_type, save_path):
     train_set = torch.utils.data.Subset(train_dataset, train_idx.tolist())
     val_set = torch.utils.data.Subset(val_dataset, val_idx.tolist())
 
-    # Weighted sampler to help if class imbalance appears in train split
-    # compute class counts on train_set
     train_labels = []
     for idx in train_idx.tolist():
         _, genre = samples[idx]
@@ -225,7 +219,6 @@ def train_model(spectrogram_type, save_path):
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     train_losses, val_losses, val_accuracies = [], [], []
     best_val_acc = 0.0
-    # Scheduler to reduce LR on plateau
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.5, patience=3)
 
     for epoch in range(EPOCHS):
@@ -241,7 +234,7 @@ def train_model(spectrogram_type, save_path):
             running_loss += loss.item() * inputs.size(0)
         epoch_loss = running_loss / len(train_set)
         train_losses.append(epoch_loss)
-    # Validação
+
         model.eval()
         val_loss = 0.0
         correct = 0
@@ -260,21 +253,20 @@ def train_model(spectrogram_type, save_path):
         val_acc = correct / total if total > 0 else 0
         val_accuracies.append(val_acc)
         print(f'Epoch {epoch+1}/{EPOCHS} - Loss: {epoch_loss:.4f} - Val Loss: {val_loss:.4f} - Val Acc: {val_acc:.4f}')
-        # Step scheduler
+        
         scheduler.step(val_acc)
-        # Save best model
+
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save(model.state_dict(), save_path)
             print(f'Novo melhor modelo salvo (val_acc={best_val_acc:.4f}) em {save_path}')
-    # If model wasn't saved by scheduler loop (no improvement), save final state
     if best_val_acc == 0.0:
         torch.save(model.state_dict(), save_path)
         print(f'Modelo final salvo em {save_path}')
-    # Avaliação final e métricas
+
     results_dir = os.path.join("results", spectrogram_type)
     os.makedirs(results_dir, exist_ok=True)
-    # Curvas de loss e acurácia
+
     plt.figure()
     plt.plot(train_losses, label='Train Loss')
     plt.plot(val_losses, label='Val Loss')

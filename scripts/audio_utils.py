@@ -74,9 +74,9 @@ def split_segments(y, sr=SR, segment_sec=3):
     seg_len = segment_sec * sr
     return [y[i:i+seg_len] for i in range(0, len(y), seg_len) if len(y[i:i+seg_len]) == seg_len]
 
-def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=512, fmax=8000, img_size=512):
+def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=256, fmax=10000, img_size=256, n_fft=1024, hop_length=256):
     """
-    Gera espectrograma mel e salva como imagem PNG em alta resolução.
+    Gera espectrograma mel e salva como imagem PNG em alta resolução, com alta definição temporo-frequencial.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -84,7 +84,7 @@ def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=512, fmax=8000, img_siz
     import librosa.display
     import numpy as np
 
-    S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, fmax=fmax)
+    S = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=n_mels, fmax=fmax, n_fft=n_fft, hop_length=hop_length)
     S_dB = librosa.power_to_db(S, ref=np.max)
 
     if out_path:
@@ -92,7 +92,7 @@ def save_mel_spectrogram(y, sr=SR, out_path=None, n_mels=512, fmax=8000, img_siz
         ax = fig.add_axes([0, 0, 1, 1])
         ax.axis("off")
 
-        librosa.display.specshow(S_dB, sr=sr, fmax=fmax, ax=ax)
+        librosa.display.specshow(S_dB, sr=sr, fmax=fmax, ax=ax, hop_length=hop_length)
         fig.savefig(out_path, bbox_inches="tight", pad_inches=0)
         plt.close(fig)
 

@@ -115,7 +115,7 @@ def predict_genres(audio_path, model_30s_path, model_3s_path, out_root="./predic
 
 if __name__ == '__main__':
 
-    audio_path = '/home/christian/Músicas/music5.mp3'
+    audio_path = '/home/christian/Músicas/music2.mp3'
     model_30s_path = 'models/cnn_30s.pth'
     model_3s_path = 'models/cnn_3s.pth'
 
