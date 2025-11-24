@@ -15,7 +15,7 @@ from audio_utils import (
     SR,
 )
 
-DATA_DIR = "/home/christian/Documentos/music_dataset/Data/genres_original/"
+DATA_DIR = "/home/chris/Documents/music_dataset/Data/genres_original/"
 CSV_30S = "./data/csv/features_30s.csv"
 CSV_3S = "./data/csv/features_3s.csv"
 SEGMENT_DURATION = 3   # segundos

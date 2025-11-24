@@ -11,10 +11,16 @@ from audio_utils import (
     SR,
 )
 
-DATA_PATH = "/home/christian/Documentos/music_dataset/Data/genres_original/"
+DATA_PATH = "/home/chris/Documents/music_dataset/Data/genres_original/"
 OUT_PATH_30S = "./data/spectograms_30s/"
 OUT_PATH_3S = "./data/spectograms_3s/"
 CHUNK_DURATION = 3  # segundos
+
+# Garante que só converte/copia se o arquivo não for WAV
+def ensure_wav(file_path):
+    if file_path.lower().endswith(".wav"):
+        return file_path  # usa o próprio arquivo
+    return convert_to_wav(file_path)  # converte e copia para auxiliar
 
 genres = [d for d in os.listdir(DATA_PATH) if os.path.isdir(os.path.join(DATA_PATH, d))]
 
@@ -28,7 +34,7 @@ for genre in genres:
 
     for idx, file_path in enumerate(files, 1):
         try:
-            wav_path = convert_to_wav(file_path)
+            wav_path = ensure_wav(file_path)
             y = load_audio(wav_path, sr=SR)
         except Exception as e:
             print(f"Erro ao carregar {file_path}: {e}")
