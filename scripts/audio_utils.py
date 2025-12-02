@@ -22,9 +22,7 @@ def convert_to_wav(file_path, out_dir='converted_wavs'):
             print(f"Converted MP3 -> WAV: {out_path}")
             return out_path
 
-        # if already wav, copy to out_dir for processing consistency
         if file_path.lower().endswith('.wav'):
-            # Avoid copying if source and destination are the same file
             try:
                 src_abs = os.path.abspath(file_path)
                 dst_abs = os.path.abspath(out_path)
@@ -32,18 +30,15 @@ def convert_to_wav(file_path, out_dir='converted_wavs'):
                     shutil.copy(file_path, out_path)
                     print(f"[INFO] Copied WAV to auxiliary folder: {out_path}")
             except Exception:
-                # If copying fails, fall back to returning original path
                 return file_path
             return out_path
 
-        # For other formats, attempt a generic load/export via pydub
         try:
             audio = AudioSegment.from_file(file_path)
             audio.export(out_path, format='wav')
             print(f"[INFO] Converted file -> WAV: {out_path}")
             return out_path
         except Exception:
-            # fallback: return original path if conversion not possible
             return file_path
     except Exception as e:
         print(f"Falha ao criar pasta de conversão ou converter arquivo: {e}")
@@ -143,8 +138,8 @@ def load_spectrogram_as_tensor(image_path, img_size=(512, 512)):
 
     transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])  # mesma normalização usada no treino
+        transforms.Normalize([0.5], [0.5])
     ])
 
-    tensor = transform(img).unsqueeze(0)  # adiciona dimensão batch
+    tensor = transform(img).unsqueeze(0)
     return tensor

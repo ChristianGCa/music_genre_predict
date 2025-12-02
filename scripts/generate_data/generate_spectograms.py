@@ -16,11 +16,10 @@ OUT_PATH_30S = "./data/spectograms_30s/"
 OUT_PATH_3S = "./data/spectograms_3s/"
 CHUNK_DURATION = 3  # segundos
 
-# Garante que só converte/copia se o arquivo não for WAV
 def ensure_wav(file_path):
     if file_path.lower().endswith(".wav"):
-        return file_path  # usa o próprio arquivo
-    return convert_to_wav(file_path)  # converte e copia para auxiliar
+        return file_path
+    return convert_to_wav(file_path)
 
 genres = [d for d in os.listdir(DATA_PATH) if os.path.isdir(os.path.join(DATA_PATH, d))]
 

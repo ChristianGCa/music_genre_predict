@@ -97,7 +97,7 @@ class SpectrogramDataset(Dataset):
             return name.rsplit('_', 1)[0]
         return name
 
-class ImprovedCNN(nn.Module):
+class SpectrogramCNN(nn.Module):
     """A small, deeper CNN with BatchNorm and Dropout and adaptive pooling."""
     def __init__(self, num_classes):
         super().__init__()
@@ -214,7 +214,7 @@ def train_model(spectrogram_type, save_path):
     train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, sampler=sampler)
     val_loader = DataLoader(val_set, batch_size=BATCH_SIZE, shuffle=False)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = ImprovedCNN(num_classes=len(GENRES)).to(device)
+    model = SpectrogramCNN(num_classes=len(GENRES)).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
     train_losses, val_losses, val_accuracies = [], [], []
