@@ -8,7 +8,7 @@ from datetime import datetime
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from audio_utils import convert_to_wav, extract_middle_segment, save_mel_spectrogram, load_spectrogram_as_tensor
-from train_models.train_model_spectograms import ImprovedCNN, GENRES, IMG_SIZE
+from train_models.train_model_spectograms import SpectrogramCNN, GENRES, IMG_SIZE
 
 import tempfile
 
@@ -46,11 +46,11 @@ def predict_genres(audio_path, model_30s_path, model_3s_path, out_root="./predic
                 pass
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model_30s = ImprovedCNN(num_classes=len(GENRES)).to(device)
+    model_30s = SpectrogramCNN(num_classes=len(GENRES)).to(device)
     model_30s.load_state_dict(torch.load(model_30s_path, map_location=device))
     model_30s.eval()
 
-    model_3s = ImprovedCNN(num_classes=len(GENRES)).to(device)
+    model_3s = SpectrogramCNN(num_classes=len(GENRES)).to(device)
     model_3s.load_state_dict(torch.load(model_3s_path, map_location=device))
     model_3s.eval()
 
@@ -115,7 +115,7 @@ def predict_genres(audio_path, model_30s_path, model_3s_path, out_root="./predic
 
 if __name__ == '__main__':
 
-    audio_path = '/home/christian/Músicas/music2.mp3'
+    audio_path = '/home/christian/Músicas/music6.mp3'
     model_30s_path = 'models/cnn_30s.pth'
     model_3s_path = 'models/cnn_3s.pth'
 
